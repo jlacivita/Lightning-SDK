@@ -21,14 +21,17 @@ import { default as mock } from './mock'
 import { default as queue } from './queue'
 import { initSettings } from '../Settings'
 
+import { emit } from '../Events'
+
 // TODO need to spec Firebolt Settings
 initSettings({}, { log: true })
 
 const promises = []
 let transport
-let id = 0
+let id = 1
 let transport_service_name = 'com.comcast.BridgeObject_1'
 let timeout
+let event_map = {}
 
 // create global handshake namespace
 if (!window.__firebolt) {
@@ -75,28 +78,62 @@ const send = (module, method, params) => {
     promises[id].promise = this
     promises[id].resolve = resolve
     promises[id].reject = reject
+
+    // store the ID of the first listen for each event
+    // TODO: what about wild cards?
+    if (method === 'listen' && !event_map[params.module.toLowerCase() + '.' + params.event]) {
+      event_map[params.module.toLowerCase() + '.' + params.event] = id
+    }
   })
 
   let json = { jsonrpc: '2.0', method: module + '.' + method, params: params, id: id }
   id++
-  transport.send(json)
+  transport.send(JSON.stringify(json))
 
   return p
 }
 
-transport = getTransportLayer()
-
-// TODO: clean up resolved promises
-transport.receive(json => {
+const receive_handler = message => {
+  let json = JSON.parse(message)
   let p = promises[json.id]
 
   if (p) {
     if (json.error) p.reject(json.error)
     else {
+      promises[json.id] = null
       p.resolve(json.result)
     }
   }
-})
+
+  // event responses need to be emitted, even after the listen call is resolved
+  if (Object.values(event_map).indexOf(json.id) >= 0) {
+    if (json.result && typeof json.result === 'object' && 'module' in json.result)
+      emit(json.result.module, json.result.event, json.result.value)
+  }
+}
+
+// used to send mock events out-of-band
+export const mock_event = (module, event, value) => {
+  let id = event_map[module + '.' + event] || event_map[module + '.*'] || event_map['*.*']
+  if (id) {
+    let message = JSON.stringify({
+      jsonrpc: '2.0',
+      id: id,
+      result: {
+        foo: 'bar',
+        module: module,
+        event: event,
+        value: value,
+      },
+    })
+    receive_handler(message)
+  }
+}
+
+transport = getTransportLayer()
+
+// TODO: clean up resolved promises
+transport.receive(receive_handler)
 
 if (window.__firebolt.getTransportLayer) {
   setTransportLayer(window.__firebolt.getTransportLayer())

@@ -20,6 +20,7 @@
 import { default as advertising } from '../Advertising/defaults'
 import { default as authentication } from '../Authentication/defaults'
 import { default as discovery, events as discovery_events } from '../Discovery/defaults'
+import { default as events } from '../Events/defaults'
 import { default as lifecycle } from '../Lifecycle/defaults'
 import { default as metrics } from '../Metrics/defaults'
 import { default as platform } from '../Platform/defaults'
@@ -30,20 +31,24 @@ let mock = {
   advertising: advertising,
   authentication: authentication,
   discovery: discovery,
+  events: events,
   lifecycle: lifecycle,
   metrics: metrics,
   platform: platform,
 }
 
-let events = {
+let mock_events = {
   discovery: discovery_events,
 }
 
 let callback
 
-function send(json) {
+function send(message) {
+  let json = JSON.parse(message)
   setTimeout(() =>
-    callback({ jsonrpc: '2.0', result: getResult(json.method, json.params), id: json.id })
+    callback(
+      JSON.stringify({ jsonrpc: '2.0', result: getResult(json.method, json.params), id: json.id })
+    )
   )
 }
 
@@ -53,7 +58,8 @@ function receive(_callback) {
   window['$firebolt_test_harness'] = {
     emit: function(module, event) {
       module = module.toLowerCase()
-      if (events[module] && events[module][event]) emit(module, event, events[module][event])
+      if (mock_events[module] && mock_events[module][event])
+        emit(module, event, mock_events[module][event])
     },
   }
 }

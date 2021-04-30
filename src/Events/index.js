@@ -17,6 +17,7 @@
  * limitations under the License.
  */
 
+import Transport from '../Transport'
 import Log from '../Log'
 
 let listenerId = 0
@@ -37,31 +38,43 @@ const callCallbacks = (cbs, args) => {
     })
 }
 
-export const initEvents = config => {
-  if (config.emit) config.emit(emit)
+const listen = function(...args) {
+  // grab the callback (i.e. the last argument)
+  const callback = args.pop()
+
+  if (typeof callback !== 'function') {
+    Log.error('Events', 'No valid callback passed')
+    return Promise.resolve(false)
+  } else {
+    listenerId++
+    const plugin = args[0].toLowerCase() || '*'
+    const event = args[1] || '*'
+
+    const key = plugin + '.' + event
+
+    listeners[key] = listeners[key] || {}
+    listeners[key][listenerId] = callback
+
+    let _resolve, _reject
+    let p = new Promise((resolve, reject) => {
+      _resolve = resolve
+      _reject = reject
+    })
+
+    // TODO this setTimeout solves a circular dependency between Events & Transport
+    // for the sole purpose of mock events... should find a better way
+    setTimeout(() => {
+      Transport.send('events', 'listen', { module: plugin, event: event })
+        .then(() => _resolve(true))
+        .catch(reason => _reject(reason))
+    })
+    return p
+  }
 }
 
 export default {
-  listen(...args) {
-    // grab the callback (i.e. the last argument)
-    const callback = args.pop()
-
-    if (typeof callback !== 'function') {
-      Log.error('Events', 'No valid callback passed')
-      return false
-    } else {
-      listenerId++
-      const plugin = args[0] || '*'
-      const event = args[1] || '*'
-
-      const key = plugin + '.' + event
-
-      listeners[key] = listeners[key] || {}
-      listeners[key][listenerId] = callback
-
-      return listenerId
-    }
-  },
+  listen: listen,
+  // TODO: clear needs to go through Transport Layer
   clear(pluginOrId = false, event = false) {
     if (typeof pluginOrId === 'number') {
       Log.info('Events', 'Clear listener by id (' + pluginOrId + ')')

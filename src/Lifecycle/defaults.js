@@ -18,6 +18,7 @@
  */
 
 import { store } from './index'
+import { mock_event } from '../Transport'
 
 let finished = function() {
   if (store.current === 'unloading') {
@@ -27,17 +28,30 @@ let finished = function() {
 
 export default {
   ready: function() {
-    store.current = 'inactive'
-    setTimeout(() => (store.current = 'foreground'), 100)
+    mock_event('lifecycle', 'inactive', { state: 'inactive', previous: store.current })
+    setTimeout(
+      () => mock_event('lifecycle', 'foreground', { state: 'foreground', previous: store.current }),
+      100
+    )
   },
   close: function(params) {
     let reason = params.reason
     if (reason === 'REMOTE_BUTTON') {
-      store.current = 'inactive'
-      setTimeout(() => (store.current = 'foreground'), 2000)
+      setTimeout(
+        () => mock_event('lifecycle', 'inactive', { state: 'inactive', previous: store.current }),
+        500
+      )
+      setTimeout(
+        () =>
+          mock_event('lifecycle', 'foreground', { state: 'foreground', previous: store.current }),
+        5000
+      )
     } else {
-      store.current = 'inactive'
-      setTimeout(() => (store.current = 'unloading'), 500)
+      mock_event('lifecycle', 'inactive', { state: 'inactive', previous: store.current })
+      setTimeout(
+        () => mock_event('lifecycle', 'unloading', { state: 'unloading', previous: store.current }),
+        500
+      )
       setTimeout(() => finished(), 2500)
     }
   },

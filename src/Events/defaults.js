@@ -17,38 +17,14 @@
  * limitations under the License.
  */
 
-import Events from '../Events'
-import Metrics from '../Metrics'
-import Transport from '../Transport'
-
-Events.listen('Lifecycle', event => {
-  store._current = event
-})
-
-export const store = {
-  _current: 'initializing',
-  get current() {
-    return this._current
-  },
-}
-
-// public API
 export default {
-  state() {
-    return store.current
+  listen: function() {
+    return true
   },
-  ready() {
-    Metrics.app.ready()
-    return Transport.send('lifecycle', 'ready')
+  clear: function() {
+    return true
   },
-  close(reason) {
-    return Transport.send('lifecycle', 'close', { reason: reason })
-  },
-  finished() {
-    if (store.current === 'unloading') {
-      Metrics.app.close()
-    } else throw 'Cannot call finished() except when in the unloading transition'
-
-    return Transport.send('lifecycle', 'finished')
+  broadcast: function() {
+    return true
   },
 }
